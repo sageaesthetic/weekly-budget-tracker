@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Budget">
+    <title>Weekly Budget</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px 16px 100px;
+            padding-top: max(20px, env(safe-area-inset-top));
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .header h1 {
+            font-size: 1.4em;
+            background: linear-gradient(135deg, #00d2ff, #7b2ff7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+
+        /* Week navigation */
+        .week-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 6px;
+        }
+        .week-nav-btn {
+            background: none;
+            border: 1px solid #333;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            color: #888;
+            font-size: 1.2em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .week-nav-btn:active { border-color: #5f6cff; color: #5f6cff; }
+        .week-nav-btn:disabled { opacity: 0.2; cursor: default; }
+        .week-label {
+            color: #ccc;
+            font-size: 0.95em;
+            font-weight: 600;
+            min-width: 170px;
+            text-align: center;
+        }
+        .week-current-tag {
+            display: inline-block;
+            font-size: 0.7em;
+            background: rgba(95, 108, 255, 0.2);
+            color: #5f6cff;
+            padding: 2px 8px;
+            border-radius: 8px;
+            margin-left: 6px;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+        .past-week-banner {
+            text-align: center;
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        /* Remaining balance */
+        .balance-card {
+            background: linear-gradient(135deg, #1a2a1a, #162e16);
+            border-radius: 20px;
+            padding: 28px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            border: 1px solid #2a4a2a;
+            transition: all 0.3s ease;
+        }
+        .balance-card.warning {
+            background: linear-gradient(135deg, #2a2a1a, #2e2816);
+            border-color: #4a4a2a;
+        }
+        .balance-card.danger {
+            background: linear-gradient(135deg, #2a1a1a, #2e1616);
+            border-color: #4a2a2a;
+        }
+        .balance-card.past {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border-color: #2a2a4a;
+        }
+        .balance-label {
+            font-size: 0.85em;
+            color: #88aa88;
+            margin-bottom: 4px;
+        }
+        .balance-card.warning .balance-label { color: #aaaa88; }
+        .balance-card.danger .balance-label { color: #aa8888; }
+        .balance-card.past .balance-label { color: #8888aa; }
+        .balance-amount {
+            font-size: 3.8em;
+            font-weight: 900;
+            color: #00ff88;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        .balance-card.warning .balance-amount { color: #ffcc00; }
+        .balance-card.danger .balance-amount { color: #ff4757; }
+        .balance-card.past .balance-amount { color: #a29bfe; }
+        .balance-of {
+            font-size: 0.85em;
+            color: #557755;
+        }
+        .balance-card.warning .balance-of { color: #777755; }
+        .balance-card.danger .balance-of { color: #775555; }
+        .balance-card.past .balance-of { color: #555577; }
+
+        /* Progress bar */
+        .progress-wrap {
+            margin: 16px auto 0;
+            max-width: 280px;
+        }
+        .progress-track {
+            height: 8px;
+            background: #0a0a15;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #00b894, #55efc4);
+            transition: width 0.4s ease;
+        }
+        .balance-card.warning .progress-fill { background: linear-gradient(90deg, #e0a800, #ffcc00); }
+        .balance-card.danger .progress-fill { background: linear-gradient(90deg, #cc0022, #ff4757); }
+        .balance-card.past .progress-fill { background: linear-gradient(90deg, #6c5ce7, #a29bfe); }
+
+        /* Quick add */
+        .add-section {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #2a2a4a;
+        }
+        .add-section h3 {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 14px;
+        }
+        .input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .input-wrap {
+            flex: 1;
+            position: relative;
+        }
+        .input-wrap .dollar-sign {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+        input[type="number"], input[type="text"] {
+            width: 100%;
+            background: #0f0f1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 14px;
+            color: #fff;
+            font-size: 1.1em;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="number"] {
+            padding-left: 30px;
+        }
+        input:focus { border-color: #5f6cff; }
+        input::placeholder { color: #444; }
+
+        .category-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .chip {
+            padding: 8px 14px;
+            border-radius: 20px;
+            background: #0f0f1a;
+            border: 1px solid #333;
+            color: #aaa;
+            font-size: 0.82em;
+            cursor: pointer;
+            transition: all 0.2s;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .chip.active {
+            background: rgba(95, 108, 255, 0.2);
+            border-color: #5f6cff;
+            color: #5f6cff;
+        }
+
+        .add-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 14px;
+            border: none;
+            background: linear-gradient(135deg, #3742fa, #5f6cff);
+            color: white;
+            font-size: 1.05em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .add-btn:active { opacity: 0.7; }
+        .add-btn:disabled { opacity: 0.3; cursor: default; }
+
+        /* Purchase list */
+        .purchases-section {
+            margin-bottom: 20px;
+        }
+        .purchases-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .purchases-header h3 {
+            font-size: 0.9em;
+            color: #888;
+        }
+        .spent-total {
+            font-size: 0.9em;
+            color: #ff6b81;
+            font-weight: 600;
+        }
+
+        .purchase-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            border: 1px solid #2a2a4a;
+        }
+        .purchase-left {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .purchase-note {
+            font-size: 0.95em;
+            color: #ddd;
+        }
+        .purchase-meta {
+            font-size: 0.75em;
+            color: #555;
+        }
+        .purchase-amount {
+            font-size: 1.15em;
+            font-weight: 700;
+            color: #ff6b81;
+        }
+        .purchase-delete {
+            background: none;
+            border: none;
+            color: #444;
+            font-size: 1.2em;
+            padding: 4px 8px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .purchase-delete:active { color: #ff4757; }
+        .purchase-right {
+            display: flex;
+            align-items: center;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #444;
+            font-size: 0.9em;
+        }
+
+        /* Reset button */
+        .reset-section {
+            text-align: center;
+            margin-top: 16px;
+        }
+        .reset-btn {
+            background: none;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 10px 20px;
+            color: #555;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+        .reset-btn:active { border-color: #ff4757; color: #ff4757; }
+
+        /* Days remaining */
+        .days-left {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .day-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #2a4a2a;
+        }
+        .day-dot.past { background: #444; }
+        .day-dot.today { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+        .day-dot.future { background: #1a3a1a; }
+        .day-dot.all-past { background: #555; }
+        .balance-card.warning .day-dot.today { background: #ffcc00; box-shadow: 0 0 6px #ffcc00; }
+        .balance-card.danger .day-dot.today { background: #ff4757; box-shadow: 0 0 6px #ff4757; }
+
+        .per-day {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 0.8em;
+            color: #557755;
+        }
+        .balance-card.warning .per-day { color: #777755; }
+        .balance-card.danger .per-day { color: #775555; }
+        .balance-card.past .per-day { color: #555577; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Weekly Budget</h1>
+        <div class="week-nav">
+            <button class="week-nav-btn" id="prevWeek">&#8249;</button>
+            <div class="week-label" id="weekLabel"></div>
+            <button class="week-nav-btn" id="nextWeek">&#8250;</button>
+        </div>
+        <div class="past-week-banner" id="pastBanner"></div>
+    </div>
+
+    <div class="balance-card" id="balanceCard">
+        <div class="balance-label" id="balanceLabel">Remaining This Week</div>
+        <div class="balance-amount" id="balanceAmount">$205</div>
+        <div class="balance-of">of $205 weekly budget</div>
+        <div class="days-left" id="daysLeft"></div>
+        <div class="per-day" id="perDay"></div>
+        <div class="progress-wrap">
+            <div class="progress-track">
+                <div class="progress-fill" id="progressFill" style="width: 100%"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="add-section">
+        <h3 id="addSectionLabel">Log a Purchase</h3>
+        <div class="input-row">
+            <div class="input-wrap" style="flex: 0.6;">
+                <span class="dollar-sign">$</span>
+                <input type="number" id="amountInput" placeholder="0.00" step="0.01" inputmode="decimal">
+            </div>
+            <div class="input-wrap" style="flex: 1;">
+                <input type="text" id="noteInput" placeholder="What was it?">
+            </div>
+        </div>
+        <div class="category-chips" id="categoryChips">
+            <div class="chip" data-cat="Food">Food</div>
+            <div class="chip" data-cat="Coffee">Coffee</div>
+            <div class="chip" data-cat="Shopping">Shopping</div>
+            <div class="chip" data-cat="Entertainment">Entertainment</div>
+            <div class="chip" data-cat="Travel">Travel</div>
+            <div class="chip" data-cat="Other">Other</div>
+        </div>
+        <button class="add-btn" id="addBtn" disabled>Add Purchase</button>
+    </div>
+
+    <div class="purchases-section">
+        <div class="purchases-header">
+            <h3 id="purchasesLabel">This Week's Purchases</h3>
+            <span class="spent-total" id="spentTotal"></span>
+        </div>
+        <div id="purchaseList"></div>
+    </div>
+
+    <div class="reset-section">
+        <button class="reset-btn" id="resetBtn">Reset Week</button>
+    </div>
+
+    <script>
+        const WEEKLY_BUDGET = 205;
+        const STORAGE_KEY = 'sage_budget_weeks';
+
+        // --- Data layer: all weeks stored in one object keyed by week start ISO string ---
+
+        function getAllWeeks() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) {
+                // Migrate from old single-week format
+                const oldData = localStorage.getItem('sage_budget_tracker');
+                if (oldData) {
+                    const parsed = JSON.parse(oldData);
+                    if (parsed.weekStart && parsed.purchases) {
+                        const weeks = {};
+                        weeks[parsed.weekStart] = parsed.purchases;
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(weeks));
+                        localStorage.removeItem('sage_budget_tracker');
+                        return weeks;
+                    }
+                }
+                // Also migrate any archived weeks
+                const weeks = {};
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('sage_budget_archive_')) {
+                        const archived = JSON.parse(localStorage.getItem(key));
+                        if (archived.weekStart && archived.purchases) {
+                            weeks[archived.weekStart] = archived.purchases;
+                        }
+                    }
+                }
+                if (Object.keys(weeks).length > 0) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(weeks));
+                    return weeks;
+                }
+                return {};
+            }
+            return JSON.parse(raw);
+        }
+
+        function saveAllWeeks(weeks) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(weeks));
+        }
+
+        function getWeekPurchases(weekKey) {
+            const weeks = getAllWeeks();
+            return weeks[weekKey] || [];
+        }
+
+        function saveWeekPurchases(weekKey, purchases) {
+            const weeks = getAllWeeks();
+            weeks[weekKey] = purchases;
+            saveAllWeeks(weeks);
+        }
+
+        // --- Week math ---
+
+        function getWeekStart(date) {
+            const d = new Date(date);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            d.setDate(diff);
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+
+        function weekKey(date) {
+            return getWeekStart(date).toISOString();
+        }
+
+        function shiftWeek(weekStartISO, offset) {
+            const d = new Date(weekStartISO);
+            d.setDate(d.getDate() + (7 * offset));
+            return d.toISOString();
+        }
+
+        function formatDate(date) {
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function formatWeekRange(weekStartISO) {
+            const start = new Date(weekStartISO);
+            const end = new Date(start);
+            end.setDate(end.getDate() + 6);
+            return `${formatDate(start)} - ${formatDate(end)}`;
+        }
+
+        // --- Navigation state ---
+
+        const currentWeekKey = weekKey(new Date());
+        let viewingWeekKey = currentWeekKey;
+
+        // Ensure current week exists
+        function ensureCurrentWeek() {
+            const weeks = getAllWeeks();
+            if (!weeks[currentWeekKey]) {
+                weeks[currentWeekKey] = [];
+                saveAllWeeks(weeks);
+            }
+        }
+
+        // Get all week keys sorted oldest first
+        function getSortedWeekKeys() {
+            const weeks = getAllWeeks();
+            // Always include current week
+            if (!weeks[currentWeekKey]) weeks[currentWeekKey] = [];
+            return Object.keys(weeks).sort();
+        }
+
+        function isCurrentWeek() {
+            return viewingWeekKey === currentWeekKey;
+        }
+
+        function getDayOfWeek() {
+            const day = new Date().getDay();
+            return day === 0 ? 6 : day - 1;
+        }
+
+        // --- Render ---
+
+        function render() {
+            ensureCurrentWeek();
+            const purchases = getWeekPurchases(viewingWeekKey);
+            const spent = purchases.reduce((sum, p) => sum + p.amount, 0);
+            const remaining = Math.max(0, WEEKLY_BUDGET - spent);
+            const current = isCurrentWeek();
+
+            // Week label
+            const labelEl = document.getElementById('weekLabel');
+            let labelHtml = formatWeekRange(viewingWeekKey);
+            if (current) labelHtml += '<span class="week-current-tag">This Week</span>';
+            labelEl.innerHTML = labelHtml;
+
+            // Nav buttons
+            const sortedKeys = getSortedWeekKeys();
+            const currentIndex = sortedKeys.indexOf(viewingWeekKey);
+            document.getElementById('prevWeek').disabled = currentIndex <= 0;
+            document.getElementById('nextWeek').disabled = current;
+
+            // Past week banner
+            const bannerEl = document.getElementById('pastBanner');
+            bannerEl.textContent = current ? '' : 'Viewing a past week — you can still add or remove purchases';
+
+            // Balance label
+            document.getElementById('balanceLabel').textContent =
+                current ? 'Remaining This Week' : 'Unspent That Week';
+
+            // Balance
+            const pct = remaining / WEEKLY_BUDGET;
+            document.getElementById('balanceAmount').textContent =
+                `$${remaining.toFixed(remaining % 1 === 0 ? 0 : 2)}`;
+
+            const card = document.getElementById('balanceCard');
+            card.className = 'balance-card';
+            if (!current) {
+                card.classList.add('past');
+            } else if (pct <= 0.15) {
+                card.classList.add('danger');
+            } else if (pct <= 0.4) {
+                card.classList.add('warning');
+            }
+
+            // Progress
+            document.getElementById('progressFill').style.width = `${pct * 100}%`;
+
+            // Day dots
+            const dayOfWeek = getDayOfWeek();
+            let dotsHtml = '';
+            for (let i = 0; i < 7; i++) {
+                let cls = 'day-dot';
+                if (current) {
+                    if (i < dayOfWeek) cls += ' past';
+                    else if (i === dayOfWeek) cls += ' today';
+                    else cls += ' future';
+                } else {
+                    cls += ' all-past';
+                }
+                dotsHtml += `<div class="${cls}"></div>`;
+            }
+            document.getElementById('daysLeft').innerHTML = dotsHtml;
+
+            // Per day remaining
+            const perDayEl = document.getElementById('perDay');
+            if (current) {
+                const daysLeft = 7 - dayOfWeek;
+                if (remaining > 0 && daysLeft > 0) {
+                    perDayEl.textContent = `~$${(remaining / daysLeft).toFixed(0)}/day for ${daysLeft} day${daysLeft > 1 ? 's' : ''} left`;
+                } else if (remaining <= 0) {
+                    perDayEl.textContent = 'Budget spent for the week';
+                } else {
+                    perDayEl.textContent = '';
+                }
+            } else {
+                const savedAmt = WEEKLY_BUDGET - spent;
+                if (savedAmt > 0) {
+                    perDayEl.textContent = `$${savedAmt.toFixed(0)} under budget that week`;
+                } else if (savedAmt < 0) {
+                    perDayEl.textContent = `$${Math.abs(savedAmt).toFixed(0)} over budget that week`;
+                } else {
+                    perDayEl.textContent = 'Spent exactly $205 that week';
+                }
+            }
+
+            // Add section label
+            document.getElementById('addSectionLabel').textContent =
+                current ? 'Log a Purchase' : 'Add a Missed Purchase';
+
+            // Purchases label
+            document.getElementById('purchasesLabel').textContent =
+                current ? "This Week's Purchases" : "That Week's Purchases";
+
+            // Spent total
+            document.getElementById('spentTotal').textContent =
+                spent > 0 ? `-$${spent.toFixed(2)} spent` : '';
+
+            // Purchase list
+            const listEl = document.getElementById('purchaseList');
+            if (purchases.length === 0) {
+                listEl.innerHTML = `<div class="empty-state">No purchases ${current ? 'yet this week' : 'logged that week'}</div>`;
+            } else {
+                const sorted = [...purchases].reverse();
+                listEl.innerHTML = sorted.map((p, i) => {
+                    const realIndex = purchases.length - 1 - i;
+                    const date = new Date(p.timestamp);
+                    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    const dayStr = date.toLocaleDateString('en-US', { weekday: 'short' });
+                    const catStr = p.category ? ` - ${p.category}` : '';
+                    return `
+                        <div class="purchase-item">
+                            <div class="purchase-left">
+                                <div class="purchase-note">${escapeHtml(p.note || 'Purchase')}</div>
+                                <div class="purchase-meta">${dayStr} ${timeStr}${catStr}</div>
+                            </div>
+                            <div class="purchase-right">
+                                <div class="purchase-amount">-$${p.amount.toFixed(2)}</div>
+                                <button class="purchase-delete" onclick="deletePurchase(${realIndex})">x</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // --- Week navigation ---
+
+        document.getElementById('prevWeek').addEventListener('click', () => {
+            const sorted = getSortedWeekKeys();
+            const idx = sorted.indexOf(viewingWeekKey);
+            if (idx > 0) {
+                viewingWeekKey = sorted[idx - 1];
+                render();
+            }
+        });
+
+        document.getElementById('nextWeek').addEventListener('click', () => {
+            const sorted = getSortedWeekKeys();
+            const idx = sorted.indexOf(viewingWeekKey);
+            if (idx < sorted.length - 1) {
+                viewingWeekKey = sorted[idx + 1];
+                render();
+            }
+        });
+
+        // --- Category chip selection ---
+
+        let selectedCategory = '';
+        document.getElementById('categoryChips').addEventListener('click', (e) => {
+            const chip = e.target.closest('.chip');
+            if (!chip) return;
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            if (selectedCategory === chip.dataset.cat) {
+                selectedCategory = '';
+            } else {
+                chip.classList.add('active');
+                selectedCategory = chip.dataset.cat;
+            }
+        });
+
+        // --- Add purchase ---
+
+        const amountInput = document.getElementById('amountInput');
+        const noteInput = document.getElementById('noteInput');
+        const addBtn = document.getElementById('addBtn');
+
+        amountInput.addEventListener('input', () => {
+            addBtn.disabled = !amountInput.value || parseFloat(amountInput.value) <= 0;
+        });
+
+        addBtn.addEventListener('click', () => {
+            const amount = parseFloat(amountInput.value);
+            if (!amount || amount <= 0) return;
+
+            const purchases = getWeekPurchases(viewingWeekKey);
+            purchases.push({
+                amount: Math.round(amount * 100) / 100,
+                note: noteInput.value.trim(),
+                category: selectedCategory,
+                timestamp: new Date().toISOString()
+            });
+            saveWeekPurchases(viewingWeekKey, purchases);
+
+            amountInput.value = '';
+            noteInput.value = '';
+            selectedCategory = '';
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            addBtn.disabled = true;
+
+            render();
+        });
+
+        // --- Delete purchase ---
+
+        function deletePurchase(index) {
+            if (!confirm('Remove this purchase?')) return;
+            const purchases = getWeekPurchases(viewingWeekKey);
+            purchases.splice(index, 1);
+            saveWeekPurchases(viewingWeekKey, purchases);
+            render();
+        }
+
+        // --- Reset week ---
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            const msg = isCurrentWeek()
+                ? 'Reset all purchases for this week?'
+                : 'Remove all purchases for this past week?';
+            if (!confirm(msg)) return;
+            saveWeekPurchases(viewingWeekKey, []);
+            render();
+        });
+
+        // --- Keyboard shortcuts ---
+
+        noteInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !addBtn.disabled) addBtn.click();
+        });
+        amountInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') noteInput.focus();
+        });
+
+        // --- Init ---
+        render();
+    </script>
+</body>
+</html>
