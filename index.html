@@ -79,6 +79,112 @@
             margin-bottom: 4px;
         }
 
+        /* Budget setting */
+        .budget-setting {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .budget-setting-label {
+            color: #666;
+            font-size: 0.85em;
+        }
+        .budget-amount-btn {
+            background: rgba(95, 108, 255, 0.1);
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 6px 14px;
+            color: #5f6cff;
+            font-size: 0.95em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .budget-amount-btn:active { border-color: #5f6cff; }
+
+        /* Budget edit modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #1a1a2e;
+            border-radius: 20px;
+            padding: 28px 24px;
+            width: 100%;
+            max-width: 340px;
+            border: 1px solid #2a2a4a;
+        }
+        .modal h3 {
+            color: #ccc;
+            font-size: 1.1em;
+            margin-bottom: 6px;
+        }
+        .modal p {
+            color: #666;
+            font-size: 0.82em;
+            margin-bottom: 18px;
+            line-height: 1.4;
+        }
+        .modal-input-wrap {
+            position: relative;
+            margin-bottom: 16px;
+        }
+        .modal-input-wrap .dollar-sign {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        .modal-input {
+            width: 100%;
+            background: #0f0f1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 16px 16px 16px 32px;
+            color: #fff;
+            font-size: 1.4em;
+            font-weight: 700;
+            outline: none;
+            -webkit-appearance: none;
+            text-align: center;
+        }
+        .modal-input:focus { border-color: #5f6cff; }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .modal-btn {
+            flex: 1;
+            padding: 14px;
+            border-radius: 12px;
+            border: none;
+            font-size: 1em;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .modal-btn.cancel {
+            background: #2a2a3a;
+            color: #888;
+        }
+        .modal-btn.save {
+            background: linear-gradient(135deg, #3742fa, #5f6cff);
+            color: white;
+        }
+        .modal-btn:active { opacity: 0.7; }
+
         /* Remaining balance */
         .balance-card {
             background: linear-gradient(135deg, #1a2a1a, #162e16);
@@ -355,6 +461,10 @@
 <body>
     <div class="header">
         <h1>Weekly Budget</h1>
+        <div class="budget-setting">
+            <span class="budget-setting-label">Weekly limit:</span>
+            <button class="budget-amount-btn" id="budgetAmountBtn">$205/wk</button>
+        </div>
         <div class="week-nav">
             <button class="week-nav-btn" id="prevWeek">&#8249;</button>
             <div class="week-label" id="weekLabel"></div>
@@ -363,10 +473,26 @@
         <div class="past-week-banner" id="pastBanner"></div>
     </div>
 
+    <!-- Budget edit modal -->
+    <div class="modal-overlay" id="budgetModal">
+        <div class="modal">
+            <h3>Set Weekly Budget</h3>
+            <p>This is saved on this device only, so each person can set their own amount.</p>
+            <div class="modal-input-wrap">
+                <span class="dollar-sign">$</span>
+                <input type="number" class="modal-input" id="budgetInput" placeholder="205" step="1" inputmode="decimal">
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" id="budgetCancel">Cancel</button>
+                <button class="modal-btn save" id="budgetSave">Save</button>
+            </div>
+        </div>
+    </div>
+
     <div class="balance-card" id="balanceCard">
         <div class="balance-label" id="balanceLabel">Remaining This Week</div>
         <div class="balance-amount" id="balanceAmount">$205</div>
-        <div class="balance-of">of $205 weekly budget</div>
+        <div class="balance-of" id="balanceOf">of $205 weekly budget</div>
         <div class="days-left" id="daysLeft"></div>
         <div class="per-day" id="perDay"></div>
         <div class="progress-wrap">
@@ -411,8 +537,20 @@
     </div>
 
     <script>
-        const WEEKLY_BUDGET = 205;
+        const DEFAULT_BUDGET = 205;
         const STORAGE_KEY = 'sage_budget_weeks';
+        const BUDGET_KEY = 'sage_budget_weekly_amount';
+
+        // --- Budget amount (per device) ---
+
+        function getWeeklyBudget() {
+            const saved = localStorage.getItem(BUDGET_KEY);
+            return saved ? parseFloat(saved) : DEFAULT_BUDGET;
+        }
+
+        function setWeeklyBudget(amount) {
+            localStorage.setItem(BUDGET_KEY, amount.toString());
+        }
 
         // --- Data layer: all weeks stored in one object keyed by week start ISO string ---
 
@@ -481,12 +619,6 @@
             return getWeekStart(date).toISOString();
         }
 
-        function shiftWeek(weekStartISO, offset) {
-            const d = new Date(weekStartISO);
-            d.setDate(d.getDate() + (7 * offset));
-            return d.toISOString();
-        }
-
         function formatDate(date) {
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
@@ -503,7 +635,6 @@
         const currentWeekKey = weekKey(new Date());
         let viewingWeekKey = currentWeekKey;
 
-        // Ensure current week exists
         function ensureCurrentWeek() {
             const weeks = getAllWeeks();
             if (!weeks[currentWeekKey]) {
@@ -512,10 +643,8 @@
             }
         }
 
-        // Get all week keys sorted oldest first
         function getSortedWeekKeys() {
             const weeks = getAllWeeks();
-            // Always include current week
             if (!weeks[currentWeekKey]) weeks[currentWeekKey] = [];
             return Object.keys(weeks).sort();
         }
@@ -533,10 +662,14 @@
 
         function render() {
             ensureCurrentWeek();
+            const budget = getWeeklyBudget();
             const purchases = getWeekPurchases(viewingWeekKey);
             const spent = purchases.reduce((sum, p) => sum + p.amount, 0);
-            const remaining = Math.max(0, WEEKLY_BUDGET - spent);
+            const remaining = Math.max(0, budget - spent);
             const current = isCurrentWeek();
+
+            // Budget button
+            document.getElementById('budgetAmountBtn').textContent = `$${budget}/wk`;
 
             // Week label
             const labelEl = document.getElementById('weekLabel');
@@ -551,17 +684,18 @@
             document.getElementById('nextWeek').disabled = current;
 
             // Past week banner
-            const bannerEl = document.getElementById('pastBanner');
-            bannerEl.textContent = current ? '' : 'Viewing a past week — you can still add or remove purchases';
+            document.getElementById('pastBanner').textContent =
+                current ? '' : 'Viewing a past week — you can still add or remove purchases';
 
             // Balance label
             document.getElementById('balanceLabel').textContent =
                 current ? 'Remaining This Week' : 'Unspent That Week';
 
             // Balance
-            const pct = remaining / WEEKLY_BUDGET;
+            const pct = remaining / budget;
             document.getElementById('balanceAmount').textContent =
                 `$${remaining.toFixed(remaining % 1 === 0 ? 0 : 2)}`;
+            document.getElementById('balanceOf').textContent = `of $${budget} weekly budget`;
 
             const card = document.getElementById('balanceCard');
             card.className = 'balance-card';
@@ -574,7 +708,7 @@
             }
 
             // Progress
-            document.getElementById('progressFill').style.width = `${pct * 100}%`;
+            document.getElementById('progressFill').style.width = `${Math.min(pct * 100, 100)}%`;
 
             // Day dots
             const dayOfWeek = getDayOfWeek();
@@ -604,13 +738,13 @@
                     perDayEl.textContent = '';
                 }
             } else {
-                const savedAmt = WEEKLY_BUDGET - spent;
+                const savedAmt = budget - spent;
                 if (savedAmt > 0) {
                     perDayEl.textContent = `$${savedAmt.toFixed(0)} under budget that week`;
                 } else if (savedAmt < 0) {
                     perDayEl.textContent = `$${Math.abs(savedAmt).toFixed(0)} over budget that week`;
                 } else {
-                    perDayEl.textContent = 'Spent exactly $205 that week';
+                    perDayEl.textContent = `Spent exactly $${budget} that week`;
                 }
             }
 
@@ -659,6 +793,38 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // --- Budget modal ---
+
+        const budgetModal = document.getElementById('budgetModal');
+        const budgetInput = document.getElementById('budgetInput');
+
+        document.getElementById('budgetAmountBtn').addEventListener('click', () => {
+            budgetInput.value = getWeeklyBudget();
+            budgetModal.classList.add('active');
+            setTimeout(() => { budgetInput.focus(); budgetInput.select(); }, 100);
+        });
+
+        document.getElementById('budgetCancel').addEventListener('click', () => {
+            budgetModal.classList.remove('active');
+        });
+
+        document.getElementById('budgetSave').addEventListener('click', () => {
+            const val = parseFloat(budgetInput.value);
+            if (val && val > 0) {
+                setWeeklyBudget(Math.round(val * 100) / 100);
+                budgetModal.classList.remove('active');
+                render();
+            }
+        });
+
+        budgetModal.addEventListener('click', (e) => {
+            if (e.target === budgetModal) budgetModal.classList.remove('active');
+        });
+
+        budgetInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('budgetSave').click();
+        });
 
         // --- Week navigation ---
 
